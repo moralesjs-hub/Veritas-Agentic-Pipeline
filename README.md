@@ -4,30 +4,22 @@ An autonomous cyclical multi-agent research and factual verification pipeline bu
 
 ## Architecture Overview
 
-[User Query]
-│
-▼
-┌──────────────┐      Refine / Re-search
-│ Planner Node │ ◄─────────────────────────┐
-└──────┬───────┘                           │
-│                                   │
-▼                                   │
-┌───────────────┐                          │
-│ Research Node │ (DuckDuckGo Retrieval)   │
-└──────┬────────┘                          │
-│                                   │
-▼                                   │
-┌─────────────────┐                        │
-│ Synthesizer Node│                        │
-└──────┬──────────┘                        │
-│                                   │
-▼                                   │
-┌───────────────┐   Verdict: REVISE        │
-│ Verifier Node │ ─────────────────────────┘
-└──────┬────────┘   (Iter < 2)
-│
-│ Verdict: APPROVED or Max Iterations Reached
-▼
+```mermaid
+flowchart TD
+    Q[User Query] --> Planner[Planner Node]
+    Planner --> Research[Research Node<br/><i>DuckDuckGo Retrieval</i>]
+    Research --> Synth[Synthesizer Node]
+    Synth --> Verifier[Verifier Node]
+
+    Verifier -->|Verdict: REVISE<br/>Iter &lt; 2| Planner
+    Verifier -->|Verdict: APPROVED or Max Iterations| Report[Final Markdown Report]
+
+    style Planner fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Research fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Synth fill:#1f2937,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style Verifier fill:#1f2937,stroke:#e11d48,stroke-width:2px,color:#fff
+    style Report fill:#1f2937,stroke:#10b981,stroke-width:2px,color:#fff
+```
 [Final Markdown Report]
 
 
