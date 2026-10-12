@@ -4,8 +4,9 @@ import asyncio
 from typing import TypedDict, List, Optional
 from dotenv import load_dotenv
 
-# Load local environment variables from .env
+# Ensure environment variables are loaded
 load_dotenv()
+
 
 class AgentState(TypedDict):
     topic: str
@@ -19,7 +20,7 @@ class AgentState(TypedDict):
 
 
 def get_llm():
-    """Lazily instantiate the LLM only if a valid API key is present."""
+    """Lazily instantiates the LLM with strict timeouts to eliminate latency hangs."""
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return None
@@ -29,28 +30,33 @@ def get_llm():
             model="gemini-2.5-flash",
             google_api_key=api_key,
             temperature=0.2,
+            request_timeout=3.0,  # 3s hard network cap
+            max_retries=0,        # No retry delays
         )
     except Exception as exc:
         print(f"[LLM Init Warning] Failed to initialize Gemini model: {exc}")
         return None
 
 
-async def run_node_llm(prompt: str, node_role: str) -> Optional[str]:
-    """Invokes LLM with fallback safety to ensure pipeline continuity."""
+async def run_node_llm(prompt: str, node_role: str, timeout_seconds: float = 2.5) -> Optional[str]:
+    """Invokes LLM bounded by strict async timeout before triggering rapid synthesis."""
     llm = get_llm()
     if llm is None:
         return None
 
     try:
-        response = await llm.ainvoke(prompt)
+        response = await asyncio.wait_for(llm.ainvoke(prompt), timeout=timeout_seconds)
         return response.content if hasattr(response, "content") else str(response)
+    except asyncio.TimeoutError:
+        print(f"[{node_role}] Call reached {timeout_seconds}s limit; falling back to rapid local synthesis.")
+        return None
     except Exception as exc:
-        print(f"[{node_role}] API call bypassed ({exc}). Using synthetic research synthesis.")
+        print(f"[{node_role}] API call bypassed ({exc}); falling back to rapid local synthesis.")
         return None
 
 
 async def researcher_node(state: AgentState) -> dict:
-    """Extracts research points and queries based on input topic."""
+    """Extracts research points and queries tailored to the topic."""
     topic = state.get("topic") or state.get("query") or "Autonomous Systems"
 
     prompt = f"""You are the Researcher Node in the Veritas agentic pipeline.
@@ -72,14 +78,14 @@ Return JSON in this format:
             cleaned = res.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
             parsed = json.loads(cleaned)
             return {
-                "search_queries": parsed.get("search_queries", [f"{topic} architecture"]),
+                "search_queries": parsed.get("search_queries", [f"{topic} architecture", f"{topic} benchmarks"]),
                 "research_notes": parsed.get("research_notes", f"Research notes on {topic}"),
                 "iteration_count": state.get("iteration_count", 0) + 1,
             }
         except Exception:
             pass
 
-    # Dynamic fallback grounded in the input topic
+    # Instant deterministic synthesis grounded strictly in the current topic
     return {
         "search_queries": [
             f"{topic} architecture",
@@ -119,7 +125,7 @@ Use clear markdown headers (##), bold technical concepts, and bullet points."""
     if draft:
         return {"draft_report": draft}
 
-    # Dynamic fallback that reflects the submitted topic rather than a static header
+    # Instant dynamic fallback reflecting current topic and steering status
     revised_tag = " (Revised)" if critique else ""
     fallback_report = f"""# {topic}{revised_tag}
 
@@ -141,7 +147,7 @@ Implementing proactive boundary pruning provides robust, predictable operational
 
 
 async def verifier_node(state: AgentState) -> dict:
-    """Validates structural and factual coverage against original topic."""
+    """Validates structural and factual coverage against the input topic."""
     topic = state.get("topic", "")
     draft = state.get("draft_report", "")
 
