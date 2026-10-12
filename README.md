@@ -22,3 +22,28 @@ flowchart TD
     API --> R
     V --> DB[(SQLite / PostgreSQL + Node Traces)]
     V --> UI
+
+# Navigate to project root and activate virtual environment
+.venv-1\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start FastAPI server on port 8000
+uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# In a separate terminal
+cd web
+npm install
+npm run dev
+
+---
+
+### Commit the Changes
+
+1. Click the **Preview** tab next to **Edit** (above line 1) to verify that the Mermaid diagram flowchart renders with no syntax warnings.
+2. Click the green **Commit changes...** button in the top right.
+3. In the modal:
+   * **Commit message:** `docs: fix Mermaid syntax and finalize project architecture documentation`
+   * Select **Commit directly to the main branch**.
+4. Click **Commit changes**.
